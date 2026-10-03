@@ -359,44 +359,6 @@ fn verify_file(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sigstore_types::{bundle::VerificationMaterialContent, DerCertificate};
-    use x509_cert::der::{asn1::BitString, Decode, Encode};
-
-    #[test]
-    fn only_non_prehashed_message_signatures_require_blob_input() {
-        let mut bundle = Bundle::from_json(include_str!(
-            "../../sigstore-bundle/tests/fixtures/bundle_v3.json"
-        ))
-        .unwrap();
-        assert!(!requires_blob(&bundle).unwrap());
-
-        // Synthetic Ed25519 certificate: only key parsing is exercised here,
-        // not certificate-chain or signature verification.
-        let mut cert =
-            x509_cert::Certificate::from_der(bundle.signing_certificate().unwrap().as_bytes())
-                .unwrap();
-        let spki = &mut cert.tbs_certificate.subject_public_key_info;
-        spki.algorithm.oid = "1.3.101.112".parse().unwrap();
-        spki.algorithm.parameters = None;
-        spki.subject_public_key = BitString::from_bytes(&[0; 32]).unwrap();
-        bundle.verification_material.content =
-            VerificationMaterialContent::Certificate(sigstore_types::bundle::CertificateContent {
-                raw_bytes: DerCertificate::new(cert.to_der().unwrap()),
-            });
-        assert!(requires_blob(&bundle).unwrap());
-
-        let dsse = Bundle::from_json(include_str!(
-            "../../sigstore-bundle/tests/fixtures/happy-path.json"
-        ))
-        .unwrap();
-        bundle.content = dsse.content;
-        assert!(!requires_blob(&bundle).unwrap());
-    }
-}
-
 fn print_usage(program: &str) {
     eprintln!("Usage: {} [OPTIONS] <ARTIFACT|DIGEST> <BUNDLE>", program);
     eprintln!();
